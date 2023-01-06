@@ -5,13 +5,13 @@ const { terser } = require('rollup-plugin-terser');
 module.exports = {
   input: './src/index.js',
   output: [
+    // {
+    //   format: "esm",
+    //   file: "./lib/dl-borderless.esm.js"
+    // },
     {
       format: "esm",
-      file: "./lib/rollup.esm.js"
-    },
-    {
-      format: "esm",
-      file: "./lib/rollup.esm.min.js",
+      file: "./lib/dl-borderless.esm.min.js",
       plugins: [
         terser({
           compress: {
@@ -20,34 +20,17 @@ module.exports = {
         })
       ]
     },
-    {
-      format: "cjs",
-      exports: 'default',
-      file: "./lib/rollup.cjs.js"
-    },
-    {
-      format: "cjs",
-      exports: 'default',
-      file: "./lib/rollup.cjs.min.js",
-      plugins: [
-        terser({
-          compress: {
-            drop_console: true
-          }
-        })
-      ]
-    },
+    // {
+    //   format: "iife",
+    //   extend: true,
+    //   file: "./lib/dl-borderless.js",
+    //   name: "DlBorderless"
+    // },
     {
       format: "iife",
       extend: true,
-      file: "./lib/rollup.iife.js",
-      name: "DlStore"
-    },
-    {
-      format: "iife",
-      extend: true,
-      file: "./lib/rollup.iife.min.js",
-      name: "DlStore",
+      file: "./lib/dl-borderless.min.js",
+      name: "DlBorderless",
       plugins: [
         terser({
           compress: {

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    * {
+      padding: 0;
+      margin: 0;
+    }
+    .myCanvas {
+      margin: 50px auto;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+</body>
+<!-- <script src="../lib/dl-borderless.js"></script> -->
+<script src="../lib/dl-borderless.min.js"></script>
+<script>
+  const dlBorderless = new DlBorderless({
+    className: 'myCanvas',
+    width: 800,
+    height: 500,
+    draggable: true,
+    boxWidth: 200,
+    boxPadding: 1,
+    boxHeight: [100, 300],
+    maxsize: 100,
+    mousehover: true,
+    animation: true,
+    animationSpeed: {
+      x: -1,
+      y: -1
+    },
+    data: [
+      {
+        url: './imgs/1.jpg',
+        // width: '',
+        // height: ''
+      },
+      {
+        url: './imgs/2.webp'
+      },
+      {
+        url: './imgs/3.webp'
+      },
+      {
+        url: './imgs/4.png'
+      },
+      {
+        url: './imgs/5.webp'
+      },
+      {
+        url: './imgs/6.webp'
+      },
+      {
+        url: './imgs/7.webp'
+      },
+      {
+        url: './imgs/8.jpg'
+      },
+      {
+        url: './imgs/10.webp'
+      },
+      {
+        url: './imgs/9.webp'
+      }
+    ]
+  })
+  console.log(dlBorderless)
+  dlBorderless.draw()
+  dlBorderless.onclick = function (e) {
+    console.log(e)
+  }
+</script>
+</html>
