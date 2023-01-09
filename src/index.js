@@ -183,38 +183,6 @@ class DlBorderless {
     }
     return false
   }
-  // 尾行补漏
-  checkLastRowHole(ctx) {
-    const visiblePaths = Object.values(BoxPath.visiblesMap)
-    for (let x = 0; x <= this.containerWidth; x += this.boxWidth) {
-      if (visiblePaths.every(i => !ctx.isPointInPath(i.path, x, this.containerHeight))) {
-        console.log('尾行漏了')
-        if (BoxPath.total > this.maxsize) {
-          console.log('首行容量溢出', BoxPath.total)
-          const deleteRow = this.boxRect.shift()
-          BoxPath.destroy(deleteRow.map(i => i.id))
-        }
-        const lastRow = this.boxRect[this.boxRect.length - 1]
-        const row = lastRow.map(i => {
-          const pic = new BoxPath({
-            ctx,
-            x: i.x,
-            y: i.y + i.height,
-            maskCtx: this.maskCtx,
-            width: this.boxWidth,
-            height: this.boxHeight,
-            padding: this.boxPadding,
-            data: this.getDataItem()
-          })
-          pic.update()
-          return pic
-        })
-        this.boxRect.push(row)
-        return true
-      }
-    }
-    return false
-  }
   // 首列补漏
   checkFirstColHole(ctx) {
     const visiblePaths = Object.values(BoxPath.visiblesMap)
@@ -258,6 +226,38 @@ class DlBorderless {
           pic.update()
           rowIndex++
         }
+        return true
+      }
+    }
+    return false
+  }
+  // 尾行补漏
+  checkLastRowHole(ctx) {
+    const visiblePaths = Object.values(BoxPath.visiblesMap)
+    for (let x = 0; x <= this.containerWidth; x += this.boxWidth) {
+      if (visiblePaths.every(i => !ctx.isPointInPath(i.path, x, this.containerHeight))) {
+        console.log('尾行漏了')
+        if (BoxPath.total > this.maxsize) {
+          console.log('首行容量溢出', BoxPath.total)
+          const deleteRow = this.boxRect.shift()
+          BoxPath.destroy(deleteRow.map(i => i.id))
+        }
+        const lastRow = this.boxRect[this.boxRect.length - 1]
+        const row = lastRow.map(i => {
+          const pic = new BoxPath({
+            ctx,
+            x: i.x,
+            y: i.y + i.height,
+            maskCtx: this.maskCtx,
+            width: this.boxWidth,
+            height: this.boxHeight,
+            padding: this.boxPadding,
+            data: this.getDataItem()
+          })
+          pic.update()
+          return pic
+        })
+        this.boxRect.push(row)
         return true
       }
     }
@@ -311,12 +311,55 @@ class DlBorderless {
     }
     return false
   }
-  drawHole() {
+  drawHole(type) {
     let hasHole = false
-    hasHole = this.checkFirstRowHole(this.ctx)
-    hasHole = this.checkLastRowHole(this.ctx) || hasHole
-    hasHole = this.checkFirstColHole(this.ctx) || hasHole
-    hasHole = this.checkLastColHole(this.ctx) || hasHole
+    switch (type) {
+      case 1:
+        // 上左
+        hasHole = this.checkLastRowHole(this.ctx)
+        hasHole = this.checkLastColHole(this.ctx) || hasHole
+        break;
+      case 2:
+        // 上
+        hasHole = this.checkLastRowHole(this.ctx)
+        break;
+      case 3:
+        // 上右
+        hasHole = this.checkFirstColHole(this.ctx)
+        hasHole = this.checkLastRowHole(this.ctx) || hasHole
+        break;
+      case 4:
+        // 左
+        hasHole = this.checkLastColHole(this.ctx)
+        break;
+      case 5:
+        // 不变
+        break;
+      case 6:
+        // 右
+        hasHole = this.checkFirstColHole(this.ctx)
+        break;
+      case 7:
+        // 下左
+        hasHole = this.checkFirstRowHole(this.ctx)
+        hasHole = this.checkLastColHole(this.ctx) || hasHole
+        break;
+      case 8:
+        // 下
+        hasHole = this.checkFirstRowHole(this.ctx)
+        break;
+      case 9:
+        // 下右
+        hasHole = this.checkFirstRowHole(this.ctx)
+        hasHole = this.checkFirstColHole(this.ctx) || hasHole
+        break;
+      default:
+        hasHole = this.checkFirstRowHole(this.ctx)
+        hasHole = this.checkLastRowHole(this.ctx) || hasHole
+        hasHole = this.checkFirstColHole(this.ctx) || hasHole
+        hasHole = this.checkLastColHole(this.ctx) || hasHole
+        break;
+    }
 
     return hasHole
   }
@@ -340,14 +383,14 @@ class DlBorderless {
     const draggingHandler = this.draggingHandler.bind(this)
     this.dragData = {
       dragging: false,
-      mousePositionX: 0,
-      mousePositionY: 0,
+      mouseX: 0,
+      mouseY: 0,
       requestId: ''
     }
     this.canvas.addEventListener('mousedown', e => {
       if (!this.draggable) return
-      this.dragData.mousePositionX = e.offsetX
-      this.dragData.mousePositionY = e.offsetY
+      this.dragData.mouseX = e.offsetX
+      this.dragData.mouseY = e.offsetY
       this.dragData.dragging = true
       this.canvas.addEventListener('mousemove', draggingHandler)
     })
@@ -370,17 +413,18 @@ class DlBorderless {
     })
   }
   draggingHandler(e) {
-    const disX = e.offsetX - this.dragData.mousePositionX
-    const disY = e.offsetY - this.dragData.mousePositionY
-    this.dragData.mousePositionX = e.offsetX
-    this.dragData.mousePositionY = e.offsetY
+    const disX = e.offsetX - this.dragData.mouseX
+    const disY = e.offsetY - this.dragData.mouseY
+    this.dragData.mouseX = e.offsetX
+    this.dragData.mouseY = e.offsetY
     this.ctx.clearRect(0, 0, this.containerWidth, this.containerHeight)
     Object.values(BoxPath.pathsMap).forEach(i => {
       i.x += disX
       i.y += disY
       i.update()
     })
-    this.drawHole()
+    const type = this.computedDirection(disX, disY)
+    this.drawHole(type)
   }
 
   // -------- hover -----------
@@ -388,6 +432,8 @@ class DlBorderless {
     this.hoverData = {
       prev: null,
       cur: null,
+      mouseX: 0,
+      mouseY: 0,
       hovering: false,
       hoverRequestId: ''
     }
@@ -398,13 +444,9 @@ class DlBorderless {
     })
     this.canvas.addEventListener('mousemove', (e) => {
       if (!this.mousehover) return
-      Object.values(BoxPath.visiblesMap).forEach(item => {
-        item.hovering = this.ctx.isPointInPath(item.path, e.offsetX, e.offsetY)
-        if (item.hovering && (!this.hoverData.cur || this.hoverData.cur.id !== item.id)) {
-          this.hoverData.prev = this.hoverData.cur;
-          this.hoverData.cur = item;
-        }
-      })
+      this.hoverData.mouseX = e.offsetX
+      this.hoverData.mouseY = e.offsetY
+      this.checkHovering()
     })
     this.canvas.addEventListener('mouseleave', () => {
       if (!this.mousehover) return
@@ -413,6 +455,16 @@ class DlBorderless {
       this.hoverData.prev = this.hoverData.cur
       this.hoverData.cur = null
       this.hoverData.prev.hovering = false
+    })
+  }
+  checkHovering() {
+    if (!this.hoverData.hovering) return
+    Object.values(BoxPath.visiblesMap).forEach(item => {
+      item.hovering = this.ctx.isPointInPath(item.hoverPath, this.hoverData.mouseX, this.hoverData.mouseY)
+      if (item.hovering && (!this.hoverData.cur || this.hoverData.cur.id !== item.id)) {
+        this.hoverData.prev = this.hoverData.cur;
+        this.hoverData.cur = item;
+      }
     })
   }
   hoverHandler() {
@@ -434,13 +486,50 @@ class DlBorderless {
       return;
     }
     this.ctx.clearRect(0, 0, this.containerWidth, this.containerHeight)
+    this.maskCtx.clearRect(0, 0, this.containerWidth, this.containerHeight);
     Object.values(BoxPath.pathsMap).forEach(i => {
       i.x += (this.animationSpeed.x || -1)
       i.y += (this.animationSpeed.y || 1)
       i.update()
     })
-    this.drawHole()
+    const type = this.computedDirection(this.animationSpeed.x || -1, this.animationSpeed.y || 1)
+    this.drawHole(type)
+    this.checkHovering()
     this.dragData.requestId = window.requestAnimationFrame(this.registerAnimation.bind(this));
+  }
+
+  /**
+   * 计算运动方向
+   * 上左（1） 上（2） 上右（3）
+   * 左（4） 不变（5） 右（6）
+   * 下左（7） 下（8） 下右（9）
+   */
+  computedDirection(x, y) {
+    if (x > 0) { // 右边
+      if (y < 0) {
+        return 3 // 上右
+      } else if (y === 0) {
+        return 6 // 右
+      } else {
+        return 9 // 下右
+      }
+    } else if (x === 0) { // 不变
+      if (y < 0) {
+        return 2 // 上
+      } else if (y === 0) {
+        return 5 // 不变
+      } else {
+        return 8 // 下
+      }
+    } else { // 左边
+      if (y < 0) {
+        return 1 // 上左
+      } else if (y === 0) {
+        return 4 // 左
+      } else {
+        return 7 // 下左
+      }
+    }
   }
 }
 

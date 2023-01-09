@@ -20,8 +20,7 @@ class BoxPath {
     this.width = width
     this.padding = padding
     this.computedHeight(height)
-    // this.color = CanvasUtils.getRandomColor()
-    this.color = '#fff'
+    this.color = CanvasUtils.getRandomColor()
     this.visible = true
     this.hovering = false
     this.imageReady = false
@@ -103,14 +102,21 @@ class BoxPath {
   }
 
   drawHandler(ctx, transform = 0) {
-    ctx.fillStyle = this.color
     this.path = new Path2D()
+    this.hoverPath = new Path2D()
     this.path.rect(
+      this.x,
+      this.y,
+      this.width,
+      this.height
+    )
+    this.hoverPath.rect(
       this.x + 1,
       this.y + 1,
       this.width - 2,
       this.height - 2
     )
+    ctx.fillStyle = '#fff'
     ctx.fillRect(
       this.x - transform,
       this.y - transform,
@@ -118,6 +124,8 @@ class BoxPath {
       this.height + transform * 2
     )
     ctx.fill(this.path)
+    // ctx.fillStyle = this.color
+    ctx.fill(this.hoverPath)
 
     this.imageReady && ctx.drawImage(
       this.img,

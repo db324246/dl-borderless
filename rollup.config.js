@@ -5,13 +5,9 @@ const { terser } = require('rollup-plugin-terser');
 module.exports = {
   input: './src/index.js',
   output: [
-    // {
-    //   format: "esm",
-    //   file: "./lib/dl-borderless.esm.js"
-    // },
     {
       format: "esm",
-      file: "./lib/dl-borderless.esm.min.js",
+      file: "./lib/dl-borderless.esm.js",
       plugins: [
         terser({
           compress: {
@@ -29,7 +25,7 @@ module.exports = {
     {
       format: "iife",
       extend: true,
-      file: "./lib/dl-borderless.min.js",
+      file: "./lib/dl-borderless.js",
       name: "DlBorderless",
       plugins: [
         terser({
