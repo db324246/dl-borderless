@@ -1,6 +1,6 @@
 {
   "name": "dl-borderless",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "一个可以无边界瀑布流渲染图片列表的插件",
   "main": "lib/dl-borderless.esm.js",
   "scripts": {
