@@ -1,12 +1,17 @@
 {
-  "name": "dl-plugin-rollup-cli",
+  "name": "dl-borderless",
   "version": "1.0.0",
-  "description": "rollup 脚手架（小插件专用）",
-  "main": "lib/rollup.esm.js",
+  "description": "一个可以无边界瀑布流渲染图片列表的插件",
+  "main": "lib/dl-borderless.esm.js",
   "scripts": {
     "build": "rollup --config"
   },
-  "keywords": [],
+  "keywords": [
+    "borderless",
+    "canvas",
+    "image",
+    "drag"
+  ],
   "author": "戴小彬",
   "license": "ISC",
   "devDependencies": {

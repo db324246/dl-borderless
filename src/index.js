@@ -16,6 +16,8 @@ class DlBorderless {
       boxPadding,
       draggable,
       mousehover,
+      loadFinished,
+      loadData,
       animation,
       animationSpeed } = config
     if (width && height) {
@@ -26,28 +28,34 @@ class DlBorderless {
       this.containerHeight = window.innerHeight
     }
     this.data = CanvasUtils.deepClone(data || [])
-    this.parentDom = document.querySelector(el) || document.body
+    this.parentDom = el || document.body
+    this.loadData = loadData
+    this.loadFinished = loadFinished !== undefined ? loadFinished : true
     this.className = className
-    this.draggable = draggable
-    this.mousehover = mousehover
-    this.animation = animation
+    this.draggable = draggable !== undefined ? draggable : true
+    this.mousehover = mousehover !== undefined ? mousehover : false
+    this.animation = animation !== undefined ? animation : false
     this.animationSpeed = animationSpeed || {}
     this.maxsize = maxsize || 500
     this.boxWidth = boxWidth || 150
     this.boxHeight = boxHeight || [150, 300]
-    this.boxPadding = boxPadding !== undefined ? boxPadding : 5
+    this.boxPadding = boxPadding !== undefined ? boxPadding : 1
     this.boxRect = [] // path 矩阵
     this.firstScreen = true
     this.initContainer()
   }
 
+  // 配置项规则校验
   validateConfig(config) {
     const typeOf = CanvasUtils.typeOf
     if (typeOf(config) !== 'object') {
       throw new Error('config must be a object')
     }
-    if (Reflect.has(config, 'el') && typeOf(config.el) !== 'string') {
-      throw new Error("el must be a string")
+    if (Reflect.has(config, 'el') && !(config.el instanceof Element)) {
+      throw new Error("el must be a DOM node")
+    }
+    if (Reflect.has(config, 'className') && typeOf(config.className) !== 'string') {
+      throw new Error("className must be a string")
     }
     if (Reflect.has(config, 'animationSpeed') && typeOf(config.animationSpeed) !== 'object') {
       throw new Error('animationSpeed must be a object')
@@ -78,11 +86,14 @@ class DlBorderless {
         }
       }
     }
+    if (Reflect.has(config, 'loadData') && !['asyncfunction', 'function'].includes(typeOf(config.loadData))) {
+      throw new Error('loadData must be a funtion and return a promise');
+    }
   }
 
   initContainer() {
     this.container = document.createElement('div')
-    this.container.className = this.className
+    this.container.className = this.className || ''
     this.container.style.position = 'relative'
     this.container.style.width = this.containerWidth + 'px'
     this.container.style.height = this.containerHeight + 'px'
@@ -153,163 +164,151 @@ class DlBorderless {
   // -------- 补漏绘制 -----------
   // 首行补漏
   checkFirstRowHole(ctx) {
-    const visiblePaths = Object.values(BoxPath.visiblesMap)
-    for (let x = 0; x <= this.containerWidth; x += this.boxWidth) {
-      if (visiblePaths.every(i => !ctx.isPointInPath(i.path, x, 0))) {
-        console.log('首行漏了')
-        if (BoxPath.total > this.maxsize) {
-          console.log('尾行容量溢出', BoxPath.total)
-          const deleteRow = this.boxRect.pop()
-          BoxPath.destroy(deleteRow.map(i => i.id))
-        }
-        const firstRow = this.boxRect[0]
-        const row = firstRow.map(i => {
-          const pic = new BoxPath({
-            ctx,
-            x: i.x,
-            maskCtx: this.maskCtx,
-            width: this.boxWidth,
-            height: this.boxHeight,
-            padding: this.boxPadding,
-            data: this.getDataItem()
-          })
-          pic.y = i.y - pic.height
-          pic.update()
-          return pic
-        })
-        this.boxRect.unshift(row)
-        return true
+    const firstRow = this.boxRect[0]
+    const maxY = Math.max(...firstRow.map(i => i.y))
+    if (maxY > -50) {
+      console.log('首行漏了');
+      if (BoxPath.total > this.maxsize) {
+        console.log('尾行容量溢出', BoxPath.total);
+        const deleteRow = this.boxRect.pop();
+        BoxPath.destroy(deleteRow.map(i => i.id));
       }
+      const row = firstRow.map(i => {
+        const pic = new BoxPath({
+          ctx,
+          x: i.x,
+          maskCtx: this.maskCtx,
+          width: this.boxWidth,
+          height: this.boxHeight,
+          padding: this.boxPadding,
+          data: this.getDataItem()
+        });
+        pic.y = i.y - pic.height;
+        pic.update();
+        return pic;
+      });
+      this.boxRect.unshift(row);
+      return true;
     }
-    return false
+    return false;
   }
   // 首列补漏
   checkFirstColHole(ctx) {
-    const visiblePaths = Object.values(BoxPath.visiblesMap)
     const firstCol = this.boxRect.map(i => i[0])
-    for (let y = 0; y <= this.containerHeight; y += this.containerHeight) {
-      if (visiblePaths.every(i => !ctx.isPointInPath(i.path, 0, y))) {
-        console.log('首列漏了')
-        if (BoxPath.total > this.maxsize) {
-          console.log('尾列容量溢出', BoxPath.total)
-          BoxPath.destroy(
-            this.boxRect.reduce((p, c) => {
-              const deleteBox = c.pop()
-              p.push(deleteBox.id)
-              return p
-            }, [])
-          )
-        }
-        let rowIndex = 0
-        const newCol = []
-        while (rowIndex < firstCol.length) {
-          const sidePic = firstCol[rowIndex]
-          let y = 0
-          if (rowIndex > 0) {
-            const prevPic = newCol[rowIndex - 1]
-            y = prevPic.y + prevPic.height
-          } else {
-            y = firstCol[0].y
-          }
-          const pic = new BoxPath({
-            ctx,
-            y,
-            x: sidePic.x - this.boxWidth,
-            maskCtx: this.maskCtx,
-            width: this.boxWidth,
-            height: this.boxHeight,
-            padding: this.boxPadding,
-            data: this.getDataItem()
-          })
-          newCol.push(pic)
-          this.boxRect[rowIndex].unshift(pic)
-          pic.update()
-          rowIndex++
-        }
-        return true
+    if (firstCol[0].x > -50) {
+      console.log('首列漏了');
+      if (BoxPath.total > this.maxsize) {
+        console.log('尾列容量溢出', BoxPath.total);
+        BoxPath.destroy(this.boxRect.reduce((p, c) => {
+          const deleteBox = c.pop();
+          p.push(deleteBox.id);
+          return p;
+        }, []));
       }
+      let rowIndex = 0;
+      const newCol = [];
+      while (rowIndex < firstCol.length) {
+        const sidePic = firstCol[rowIndex];
+        let y = 0;
+        if (rowIndex > 0) {
+          const prevPic = newCol[rowIndex - 1];
+          y = prevPic.y + prevPic.height;
+        } else {
+          y = firstCol[0].y;
+        }
+        const pic = new BoxPath({
+          ctx,
+          y,
+          x: sidePic.x - this.boxWidth,
+          maskCtx: this.maskCtx,
+          width: this.boxWidth,
+          height: this.boxHeight,
+          padding: this.boxPadding,
+          data: this.getDataItem()
+        });
+        newCol.push(pic);
+        this.boxRect[rowIndex].unshift(pic);
+        pic.update();
+        rowIndex++;
+      }
+      return true;
     }
-    return false
+    return false;
   }
   // 尾行补漏
   checkLastRowHole(ctx) {
-    const visiblePaths = Object.values(BoxPath.visiblesMap)
-    for (let x = 0; x <= this.containerWidth; x += this.boxWidth) {
-      if (visiblePaths.every(i => !ctx.isPointInPath(i.path, x, this.containerHeight))) {
-        console.log('尾行漏了')
-        if (BoxPath.total > this.maxsize) {
-          console.log('首行容量溢出', BoxPath.total)
-          const deleteRow = this.boxRect.shift()
-          BoxPath.destroy(deleteRow.map(i => i.id))
-        }
-        const lastRow = this.boxRect[this.boxRect.length - 1]
-        const row = lastRow.map(i => {
-          const pic = new BoxPath({
-            ctx,
-            x: i.x,
-            y: i.y + i.height,
-            maskCtx: this.maskCtx,
-            width: this.boxWidth,
-            height: this.boxHeight,
-            padding: this.boxPadding,
-            data: this.getDataItem()
-          })
-          pic.update()
-          return pic
-        })
-        this.boxRect.push(row)
-        return true
+    const lastRow = this.boxRect[this.boxRect.length - 1]
+    const minY = Math.min(...lastRow.map(i => i.y + i.height))
+    if (minY < this.containerHeight + 50) {
+      console.log('尾行漏了');
+      if (BoxPath.total > this.maxsize) {
+        console.log('首行容量溢出', BoxPath.total);
+        const deleteRow = this.boxRect.shift();
+        BoxPath.destroy(deleteRow.map(i => i.id));
       }
+      const lastRow = this.boxRect[this.boxRect.length - 1];
+      const row = lastRow.map(i => {
+        const pic = new BoxPath({
+          ctx,
+          x: i.x,
+          y: i.y + i.height,
+          maskCtx: this.maskCtx,
+          width: this.boxWidth,
+          height: this.boxHeight,
+          padding: this.boxPadding,
+          data: this.getDataItem()
+        });
+        pic.update();
+        return pic;
+      });
+      this.boxRect.push(row);
+      return true;
     }
-    return false
+    return false;
   }
   // 尾列补漏
   checkLastColHole(ctx) {
-    const visiblePaths = Object.values(BoxPath.visiblesMap)
     const lastCol = this.boxRect.map(i => i[i.length - 1])
-    for (let y = 0; y <= this.containerHeight; y += this.containerHeight) {
-      if (visiblePaths.every(i => !ctx.isPointInPath(i.path, this.containerWidth, y))) {
-        console.log('尾列漏了')
-        if (BoxPath.total > this.maxsize) {
-          console.log('首列容量溢出', BoxPath.total)
-          BoxPath.destroy(
-            this.boxRect.reduce((p, c) => {
-              const deleteBox = c.shift()
-              p.push(deleteBox.id)
-              return p
-            }, [])
-          )
-        }
-        let rowIndex = 0
-        const newCol = []
-        while (rowIndex < lastCol.length) {
-          const sidePic = lastCol[rowIndex]
-          let y = 0
-          if (rowIndex > 0) {
-            const prevPic = newCol[rowIndex - 1]
-            y = prevPic.y + prevPic.height
-          } else {
-            y = lastCol[0].y
-          }
-          const pic = new BoxPath({
-            ctx,
-            y,
-            x: sidePic.x + this.boxWidth,
-            maskCtx: this.maskCtx,
-            width: this.boxWidth,
-            height: this.boxHeight,
-            padding: this.boxPadding,
-            data: this.getDataItem()
-          })
-          newCol.push(pic)
-          this.boxRect[rowIndex].push(pic)
-          pic.update()
-          rowIndex++
-        }
-        return true
+    const box = lastCol[0]
+    if (box.x + box.width < this.containerWidth + 50) {
+      console.log('尾列漏了');
+      if (BoxPath.total > this.maxsize) {
+        console.log('首列容量溢出', BoxPath.total);
+        BoxPath.destroy(this.boxRect.reduce((p, c) => {
+          const deleteBox = c.shift();
+          p.push(deleteBox.id);
+          return p;
+        }, []));
       }
+      let rowIndex = 0;
+      const newCol = [];
+      while (rowIndex < lastCol.length) {
+        const sidePic = lastCol[rowIndex];
+        let y = 0;
+        if (rowIndex > 0) {
+          const prevPic = newCol[rowIndex - 1];
+          y = prevPic.y + prevPic.height;
+        } else {
+          y = lastCol[0].y;
+        }
+        const pic = new BoxPath({
+          ctx,
+          y,
+          x: sidePic.x + this.boxWidth,
+          maskCtx: this.maskCtx,
+          width: this.boxWidth,
+          height: this.boxHeight,
+          padding: this.boxPadding,
+          data: this.getDataItem()
+        });
+        newCol.push(pic);
+        this.boxRect[rowIndex].push(pic);
+        pic.update();
+        rowIndex++;
+      }
+      return true;
     }
-    return false
+    return false;
   }
   drawHole(type) {
     let hasHole = false
@@ -366,15 +365,44 @@ class DlBorderless {
 
   // 取数据项目
   getDataItem() {
+    if (!this.data.length) {
+      this.loadData && !this.loadFinished && this.handleDataLoad();
+      return {}
+    }
     const item = this.data.find(i => !i.used)
-
     if (item) {
       item.used = true
       return item
     }
-    if (!this.data.length) return {}
-    const index = CanvasUtils.getRandom(0, this.data.length - 1)
-    return this.data[index] || {}
+    if (this.loadData && !this.loadFinished && this.data.length < this.maxsize) {
+      this.handleDataLoad()
+      return {}
+    } else {
+      // 随机重复
+      const index = CanvasUtils.getRandom(0, this.data.length - 1)
+      return this.data[index] || {}
+    }
+  }
+  // 数据懒加载
+  async handleDataLoad() {
+    if (this.requestLoading) return;
+    this.requestLoading = true;
+    try {
+      const p = this.loadData();
+      if (!(p instanceof Promise)) {
+        throw new Error('loadData must be a funtion and return a promise');
+      }
+      const data = await p;
+      this.data.push(...data);
+      this.requestLoading = false;
+      Object.values(BoxPath.noDataMap).forEach(i => {
+        i.data = this.getDataItem();
+        i.loadImage();
+      });
+    } catch (err) {
+      this.requestLoading = false;
+      console.log(err);
+    }
   }
 
   // -------- 事件注册 -----------
@@ -394,10 +422,12 @@ class DlBorderless {
       this.dragData.dragging = true
       this.canvas.addEventListener('mousemove', draggingHandler)
     })
-    document.addEventListener('mouseup', () => {
+    document.addEventListener('mouseup', (e) => {
       this.dragData.dragging = false
-      this.registerAnimation()
       this.canvas.removeEventListener('mousemove', draggingHandler)
+      if (e.target === this.canvas) {
+        this.registerAnimation()
+      }
     })
     // -------- 鼠标点击 -----------
     this.canvas.addEventListener('click', e => {
@@ -450,7 +480,6 @@ class DlBorderless {
     })
     this.canvas.addEventListener('mouseleave', () => {
       if (!this.mousehover) return
-      console.log('mouseleave')
       this.hoverData.hovering = false
       this.hoverData.prev = this.hoverData.cur
       this.hoverData.cur = null

@@ -20,6 +20,22 @@
 </body>
 <script src="../lib/dl-borderless.js"></script>
 <script>
+  function loadImages() {
+    return new Promise((r, j) => {
+      const xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4) {
+          if (this.status == 200) {
+            r(JSON.parse(this.response))
+          } else {
+            j()
+          }
+        }
+      };
+      xhttp.open("GET", "https://shibe.online/api/shibes?count=10&urls=true&httpsUrls=false", true);
+      xhttp.send();
+    })
+  }
   const dlBorderless = new DlBorderless({
     className: 'myCanvas',
     width: 800,
@@ -32,48 +48,27 @@
     mousehover: true,
     animation: true,
     animationSpeed: {
-      x: -1,
-      y: -1
+      x: -0.5,
+      y: -0.5
     },
-    data: [
-      {
-        url: './imgs/1.jpg',
-        // width: '',
-        // height: ''
-      },
-      {
-        url: './imgs/2.webp'
-      },
-      {
-        url: './imgs/3.webp'
-      },
-      {
-        url: './imgs/4.png'
-      },
-      {
-        url: './imgs/5.webp'
-      },
-      {
-        url: './imgs/6.webp'
-      },
-      {
-        url: './imgs/7.webp'
-      },
-      {
-        url: './imgs/8.jpg'
-      },
-      {
-        url: './imgs/10.webp'
-      },
-      {
-        url: './imgs/9.webp'
+    loadFinished: false,
+    async loadData() {
+      try {
+        const data = await loadImages()
+        return data.map(i => ({
+          url: i
+        }))
+      } catch (err) {
+        console.log(err)
+        this.loadFinished = true
+        return []
       }
-    ]
+    }
   })
-  console.log(dlBorderless)
+
   dlBorderless.draw()
   dlBorderless.onclick = function (e) {
-    console.log(e)
+    // console.log('点击', e)
   }
 </script>
 </html>
